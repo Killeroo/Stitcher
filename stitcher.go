@@ -116,7 +116,7 @@ func main() {
 	var curHeight int
 	var curWidth int
 	for index, i := range images {
-		draw.Draw(rgba, image.Rectangle{image.Point{0,0}, image.Point{curWidth,curHeight}}, i.img, image.Point{0,0}, draw.Src)
+		draw.Draw(rgba, image.Rectangle{image.Point{curWidth,curHeight}, image.Point{curWidth + i.width,curHeight + i.height}}, i.img, image.Point{0,0}, draw.Src)
 		log.Printf("Adding image [%d] @ %dx%d", index+1, curWidth, curHeight)
 		if (index+1) % cols == 0 {
 			curHeight += i.height
