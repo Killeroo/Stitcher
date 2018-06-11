@@ -7,15 +7,23 @@
 //https://golang.org/pkg/log/
 //https://gobyexample.com/panic
 
+// TODO: Args:
+// - columns
+// - output file name
+ 
 package main
 
 import (
 	"image"
 	"image/png"
 	"image/draw"
+	"io/ioutil"
+	"strings"
 	"os"
 	"flag"
+	"net/http"
 	"log"
+	"path"
 )
 
 type ImageData struct {
@@ -25,66 +33,7 @@ type ImageData struct {
 	path   string
 }
 
-// Gets data of an image object and returns info in an ImageData struct
-func getImageData(img *image.Image, filename string) (ImageData, error) {
-	data := new(ImageData)
-	data.img = *img
-	data.path = filename
-
-	file, err := os.Open(filename)
-	if err != nil {
-		return *data, err
-	}
-	defer file.Close()
-
-	config, _, err := image.DecodeConfig(file)
-	if err != nil {
-		return *data, err
-	}
-
-	data.height = config.Height
-	data.width = config.Width
-
-	return *data, nil
-}
-
-// TODO: Comparmentalise
-func main() {
-	log.SetPrefix("[STITCHER] ")
-	log.SetFlags(0)
-	flag.Parse()
-
-	images := []*ImageData{}
-	cols := 7 // TODO: Move to flag
-
-	// Load data of all images
-	// TODO: Add directory support
-	// TODO: Check file is png
-	for index, filename := range flag.Args() {
-
-		// Try to open file
-		imgFile, err := os.Open(filename)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer imgFile.Close()
-
-		// Get image data (kept so data persists)
-		imgData, _, err := image.Decode(imgFile)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		// Load additional image data and store in array
-		imgEntry, err := getImageData(&imgData, filename)
-		if err != nil {
-			log.Fatal(err)
-		}
-		images = append(images, &imgEntry)
-
-		log.Printf("Loaded image [%d]: %s: x=%d y=%d", index+1, imgEntry.path, imgEntry.width, imgEntry.height)
-	}
-
+func saveNewImage(images ImageData, cols int, outFile string) error {
 	// Check image sizes are the same
 	// TODO: Allow image size flexibilty, switch to using average sizes
 	maxWidth := images[0].width
@@ -124,7 +73,6 @@ func main() {
 		} else {
 			curWidth += i.width
 		}
-
 	}
 
 	// Save new image
@@ -135,6 +83,154 @@ func main() {
 	}
 	png.Encode(out, rgba)
 	log.Println("New file created.")
+}
+
+// Gets data of an image object and returns info in an ImageData struct
+// Gets the config data of an image (height, width and path) and stores the
+// result in an ImageData struct which is then returned
+func getImageData(img *image.Image, filename string) (ImageData, error) {
+	data := new(ImageData)
+	data.img = *img
+	data.path = filename
+
+	file, err := os.Open(filename)
+	if err != nil {
+		return *data, err
+	}
+	defer file.Close()
+
+	config, _, err := image.DecodeConfig(file)
+	if err != nil {
+		return *data, err
+	}
+
+	data.height = config.Height
+	data.width = config.Width
+
+	return *data, nil
+}
+
+// Checks if the file is a PNG.  First function opens the file, then 'sniffs' the first 512 bytes,
+// these bytes are then given to the detectcontenttype function (hacky i know) which ascertains
+// the file type, if it is a PNG then true is returned, else false is returned 
+func isPNG(path string) (bool, error) {
+
+	file, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+
+	// 'Sniff' first 512 bytes to determine type
+	buffer := make([]byte, 512)
+	_, err = file.Read(buffer)
+	if err != nil {
+		return false, err
+	}
+	
+	// Reset read pointer
+	file.Seek(0, 0)
+
+	
+	fileType := http.DetectContentType(buffer)
+	if strings.Compare(fileType, "image/png") == 0 {
+		return true, nil
+	} else {
+		return false, nil
+	}
+}
+
+func main() {
+	log.SetPrefix("[STITCHER] ")
+	log.SetFlags(0)
+	flag.Parse()
+
+	images := []*ImageData{}
+	cols := 7 // TODO: Move to flag
+	//outFileName := "out" // TODO: Move to flag
+	fileCount := 0
+
+	// TODO: Change variable names
+	// TODO: Make neat
+	// Go through arguments and load image data
+	for index, arg := range flag.Args() {
+
+		fi, err := os.Stat(arg)
+		if err != nil {
+			log.Fatal(err)	
+		}
+
+		if fi.Mode().IsDir() {
+
+			// Read all files in directory
+		    files, _ := ioutil.ReadDir(arg)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			// Load data of all png we find
+		    for _, file := range(files) {
+		    	if !file.Mode().IsDir() {
+		    		filePath := path.Join(arg, file.Name())
+		    		if f, _ := isPNG(filePath); f == true {
+
+						// Try to open file
+						imgFile, err := os.Open(filePath)
+						if err != nil {
+							log.Fatal(err)
+						}
+						defer imgFile.Close()
+					
+						// Get image object data 
+						imgData, _, err := image.Decode(imgFile)
+						if err != nil {
+							log.Fatal(err)
+						}
+				
+						// Load additional image data and store in array
+						imgEntry, err := getImageData(&imgData, filePath)
+						if err != nil {
+							log.Fatal(err)
+						}
+						images = append(images, &imgEntry)
+		    			log.Printf("Loaded image [%d]: %s: %dx%d", index+1, imgEntry.path, imgEntry.width, imgEntry.height)
+						fileCount++
+		    		}
+		    	}
+			}
+		} else {
+			if f, _ := isPNG(arg); f == true {
+
+				// Try to open file
+				imgFile, err := os.Open(arg)
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer imgFile.Close()
+					
+				// Get image object data 
+				imgData, _, err := image.Decode(imgFile)
+				if err != nil {
+					log.Fatal(err)
+				}
+				
+				// Load additional image data and store in array
+				imgEntry, err := getImageData(&imgData, arg)
+				if err != nil {
+					log.Fatal(err)
+				}
+				images = append(images, &imgEntry)
+
+				fileCount++
+				
+			}	
+		}
+	}
+
+	// Save our new image
+	err := saveNewImage(images)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	os.Exit(0)
 
