@@ -33,7 +33,7 @@ type ImageData struct {
 	path   string
 }
 
-func saveNewImage(images ImageData, cols int, outFile string) error {
+func saveNewImage(images []ImageData, cols int, outFile string) error {
 	// Check image sizes are the same
 	// TODO: Allow image size flexibilty, switch to using average sizes
 	maxWidth := images[0].width
@@ -76,13 +76,15 @@ func saveNewImage(images ImageData, cols int, outFile string) error {
 	}
 
 	// Save new image
-	out, err := os.Create("./out.png")
+	out, err := os.Create("./" + outFile  + ".png")
 	defer out.Close()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	png.Encode(out, rgba)
 	log.Println("New file created.")
+
+	return nil
 }
 
 // Gets data of an image object and returns info in an ImageData struct
@@ -146,7 +148,7 @@ func main() {
 
 	images := []*ImageData{}
 	cols := 7 // TODO: Move to flag
-	//outFileName := "out" // TODO: Move to flag
+	outFileName := "out" // TODO: Move to flag
 	fileCount := 0
 
 	// TODO: Change variable names
@@ -191,7 +193,7 @@ func main() {
 						if err != nil {
 							log.Fatal(err)
 						}
-						images = append(images, &imgEntry)
+						images = append(images, imgEntry)
 		    			log.Printf("Loaded image [%d]: %s: %dx%d", index+1, imgEntry.path, imgEntry.width, imgEntry.height)
 						fileCount++
 		    		}
@@ -227,7 +229,7 @@ func main() {
 	}
 
 	// Save our new image
-	err := saveNewImage(images)
+	err := saveNewImage(images, cols, outFileName)
 	if err != nil {
 		log.Fatal(err)
 	}
