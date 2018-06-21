@@ -176,8 +176,6 @@ func main() {
 		log.Fatal("No files or folder provided")
 	}
 
-	// TODO: Change variable names
-	// TODO: Clean comments
 	// TODO: Put in own function at some point
 	// Go through arguments and load image data
 	for _, arg := range flag.Args() {
