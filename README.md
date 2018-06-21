@@ -1,6 +1,6 @@
 # Stitcher
 
-[![](https://img.shields.io/badge/version-1.0-brightgreen.svg)]() [![Go Report Card](https://goreportcard.com/badge/github.com/Killeroo/gobackitup)](https://goreportcard.com/report/github.com/Killeroo/gobackitup)
+[![](https://img.shields.io/badge/version-1.0-brightgreen.svg)]() [![Go Report Card](https://goreportcard.com/badge/github.com/Killeroo/stitcher)](https://goreportcard.com/report/github.com/Killeroo/stitcher)
 
 Small cross platform spritesheet generator/Image joiner. Download it [here.](https://github.com/Killeroo/stitcher/releases)
 
