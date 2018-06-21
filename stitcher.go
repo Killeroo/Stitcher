@@ -1,16 +1,7 @@
+// stitcher.go - Matthew Carney [matthewcarney64@gmail.com
 // Alot of credit to gombine (https://github.com/r3s/gombine) for providing inspiration to some
 // of the logic for obtaining image data (nioce code man)
 // Basic image manipulation stuff (https://stackoverflow.com/a/35965499)
-
-// We should be doing it like this
-//https://github.com/r3s/gombine/blob/master/main.go
-//https://golang.org/pkg/log/
-//https://gobyexample.com/panic
-
-//TODO: Add summary comments at the start of comments
-// TODO: Args:
-// - columns
-// - output file name
  
 package main
 
@@ -27,9 +18,6 @@ import (
 	"path"
 	"fmt"
 )
-
-var colCount = flag.Int("cols", 4, "Number of columns to use on generated spritesheet")
-var fileName = flag.String("name", "out", "Name of generated spritesheet")
 
 const iconText =
 `
@@ -51,14 +39,9 @@ type ImageData struct {
 	path   string
 }
 
-func usage() {
-	fmt.Println("stitcher [options] <file1> <file2> <dir1> ...")
-	fmt.Println("Options")
-	flag.PrintDefaults()
-	fmt.Println("Example: stitcher -cols 5 -name myfile C:\\Images C:\\SpecificImage\test.png")
-	os.Exit(0)
-}
-
+// Creates a new png using an array of image data. First function checks that all images are the same
+// size, then works out the dimensions of the new image, after which a new image is created and each image
+// in the list is copied over to the new image then saved.
 func saveNewImage(images []*ImageData, cols int, outFile string) error {
 	// Check image sizes are the same
 	// TODO: Allow image size flexibilty, switch to using average sizes
@@ -167,19 +150,31 @@ func isPNG(path string) (bool, error) {
 	}
 }
 
+func usage() {
+	fmt.Println("stitcher [options] <file1> <file2> <dir1> ...")
+	fmt.Println("\nOptions")
+	flag.PrintDefaults()
+	fmt.Println("\nExample: stitcher -cols 5 -name myfile C:\\Images C:\\SpecificImage\\test.png")
+	os.Exit(0)
+}
+
 func main() {
+	// Setup flags, log and icon
 	fmt.Println(iconText)
 	log.SetPrefix("[STITCHER] ")
 	log.SetFlags(0)
+	cols := flag.Int("cols", 4, "Number of columns to use on generated spritesheet")
+	filename := flag.String("name", "out", "Name of generated spritesheet")
 	flag.Usage = usage
 	flag.Parse()
 
 	images := []*ImageData{}
-	//TODO: Arg check
-	// Load arg values
-	cols := *colCount//7 // TODO: Move to flag
-	outFileName := *fileName//"out" // TODO: Move to flag
 	fileCount := 0
+
+	// Bail out if no additional arguments
+	if len(flag.Args()) == 0 {
+		log.Fatal("No files or folder provided")
+	}
 
 	// TODO: Change variable names
 	// TODO: Clean comments
@@ -263,7 +258,7 @@ func main() {
 	}
 
 	// Save our new image
-	err := saveNewImage(images, cols, outFileName)
+	err := saveNewImage(images, *cols, *filename)
 	if err != nil {
 		log.Fatal(err)
 	}
