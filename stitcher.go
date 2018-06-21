@@ -7,6 +7,7 @@
 //https://golang.org/pkg/log/
 //https://gobyexample.com/panic
 
+//TODO: Add summary comments at the start of comments
 // TODO: Args:
 // - columns
 // - output file name
@@ -24,7 +25,24 @@ import (
 	"net/http"
 	"log"
 	"path"
+	"fmt"
 )
+
+var colCount = flag.Int("cols", 4, "Number of columns to use on generated spritesheet")
+var fileName = flag.String("name", "out", "Name of generated spritesheet")
+
+const iconText =
+`
+       (o\---/o)
+        ( . . )
+       _( (T) )_
+      / /     \ \
+     / /       \ \
+     \_)       (_/
+       \   _   /
+       _)  |  (_
+      (___,'.___)   [STITCHER] - SPRITESHEET GENERATOR VERSION 1.0
+`
 
 type ImageData struct {
 	img	   image.Image
@@ -33,7 +51,15 @@ type ImageData struct {
 	path   string
 }
 
-func saveNewImage(images []ImageData, cols int, outFile string) error {
+func usage() {
+	fmt.Println("stitcher [options] <file1> <file2> <dir1> ...")
+	fmt.Println("Options")
+	flag.PrintDefaults()
+	fmt.Println("Example: stitcher -cols 5 -name myfile C:\\Images C:\\SpecificImage\test.png")
+	os.Exit(0)
+}
+
+func saveNewImage(images []*ImageData, cols int, outFile string) error {
 	// Check image sizes are the same
 	// TODO: Allow image size flexibilty, switch to using average sizes
 	maxWidth := images[0].width
@@ -76,13 +102,14 @@ func saveNewImage(images []ImageData, cols int, outFile string) error {
 	}
 
 	// Save new image
+	log.Println("Saving new file...")
 	out, err := os.Create("./" + outFile  + ".png")
 	defer out.Close()
 	if err != nil {
 		return err
 	}
 	png.Encode(out, rgba)
-	log.Println("New file created.")
+	log.Println(outFile + ".png created.")
 
 	return nil
 }
@@ -131,7 +158,6 @@ func isPNG(path string) (bool, error) {
 	
 	// Reset read pointer
 	file.Seek(0, 0)
-
 	
 	fileType := http.DetectContentType(buffer)
 	if strings.Compare(fileType, "image/png") == 0 {
@@ -142,26 +168,31 @@ func isPNG(path string) (bool, error) {
 }
 
 func main() {
+	fmt.Println(iconText)
 	log.SetPrefix("[STITCHER] ")
 	log.SetFlags(0)
+	flag.Usage = usage
 	flag.Parse()
 
 	images := []*ImageData{}
-	cols := 7 // TODO: Move to flag
-	outFileName := "out" // TODO: Move to flag
+	//TODO: Arg check
+	// Load arg values
+	cols := *colCount//7 // TODO: Move to flag
+	outFileName := *fileName//"out" // TODO: Move to flag
 	fileCount := 0
 
 	// TODO: Change variable names
-	// TODO: Make neat
+	// TODO: Clean comments
+	// TODO: Put in own function at some point
 	// Go through arguments and load image data
-	for index, arg := range flag.Args() {
+	for _, arg := range flag.Args() {
 
 		fi, err := os.Stat(arg)
 		if err != nil {
 			log.Fatal(err)	
 		}
 
-		if fi.Mode().IsDir() {
+		if fi.Mode().IsDir() { // Handle directory
 
 			// Read all files in directory
 		    files, _ := ioutil.ReadDir(arg)
@@ -193,13 +224,15 @@ func main() {
 						if err != nil {
 							log.Fatal(err)
 						}
-						images = append(images, imgEntry)
-		    			log.Printf("Loaded image [%d]: %s: %dx%d", index+1, imgEntry.path, imgEntry.width, imgEntry.height)
+						images = append(images, &imgEntry)
+		    			log.Printf("Loaded image [%d]: %s: %dx%d", fileCount+1, imgEntry.path, imgEntry.width, imgEntry.height)
 						fileCount++
 		    		}
 		    	}
 			}
-		} else {
+		} else { // Handle individual files
+
+			// Check file type
 			if f, _ := isPNG(arg); f == true {
 
 				// Try to open file
@@ -222,6 +255,7 @@ func main() {
 				}
 				images = append(images, &imgEntry)
 
+				log.Printf("Loaded image [%d]: %s: %dx%d", fileCount+1, imgEntry.path, imgEntry.width, imgEntry.height)
 				fileCount++
 				
 			}	
