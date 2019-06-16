@@ -6,10 +6,12 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"image"
 	"image/draw"
+	"image/gif"
 	"image/png"
 	"io/ioutil"
 	"log"
@@ -45,8 +47,12 @@ var images []*ImageData
 // size, then works out the dimensions of the new image, after which a new image is created and each image
 // in the list is copied over to the new image then saved.
 func saveNewImage(images []*ImageData, cols int, outFile string) error {
-	// Check image sizes are the same
+	if len(images) == 0 {
+		log.Fatal("No images have been loaded, cannot stitch images together. Check images and try again.")
+	}
+
 	// TODO: Allow image size flexibilty, switch to using average sizes
+	// Check image sizes are the same
 	maxWidth := images[0].width
 	maxHeight := images[0].height
 	for _, image := range images {
@@ -99,94 +105,138 @@ func saveNewImage(images []*ImageData, cols int, outFile string) error {
 	return nil
 }
 
-// Gets data of an image object and returns info in an ImageData struct
-// Gets the config data of an image (height, width and path) and stores the
-// result in an ImageData struct which is then returned
-func getImageData(img *image.Image, filename string) (ImageData, error) {
+// Laods the image data from a PNG and returns it in an ImageData struct
+func extractPNGData(filename string, imgData image.Image) (ImageData, error) {
 	data := new(ImageData)
-	data.img = *img
-	data.path = filename
 
+	// Try to open file
 	file, err := os.Open(filename)
 	if err != nil {
 		return *data, err
 	}
 	defer file.Close()
 
+	// Get image properties
 	config, _, err := image.DecodeConfig(file)
 	if err != nil {
 		return *data, err
 	}
 
+	// Load all the data into the struct
+	data.img = imgData
+	data.path = filename
 	data.height = config.Height
 	data.width = config.Width
 
 	return *data, nil
 }
 
-// Checks if the file is a PNG.  First function opens the file, then 'sniffs' the first 512 bytes,
-// these bytes are then given to the detectcontenttype function (hacky i know) which ascertains
-// the file type, if it is a PNG then true is returned, else false is returned
-func isPNG(path string) (bool, error) {
+func extractGIFData(filename string) {
+	log.Printf("Attempting to load image data from a GIF [%s]\n", filename)
 
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	r := bufio.NewReader(file)
+	g, err := gif.DecodeAll(r)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, image := range g.Image {
+		data := new(ImageData)
+		data.img = image
+		data.path = filename
+		data.height = g.Config.Height
+		data.width = g.Config.Width
+
+		fileCount++
+		log.Printf("Loaded image [%d]: %s: %dx%d", fileCount, data.path, data.width, data.height)
+
+		images = append(images, data)
+	}
+}
+
+// Checks the file at the path is an image file with the specified extension
+func isImageFile(path string, ext string) bool {
+	// Try opening the file
 	file, err := os.Open(path)
 	if err != nil {
-		return false, err
+		return false
 	}
 
 	// 'Sniff' first 512 bytes to determine type
 	buffer := make([]byte, 512)
 	_, err = file.Read(buffer)
 	if err != nil {
-		return false, err
+		return false
 	}
 
 	// Reset read pointer
 	file.Seek(0, 0)
 
+	// Detect that file type
 	fileType := http.DetectContentType(buffer)
-	if strings.Compare(fileType, "image/png") == 0 {
-		return true, nil
+	if strings.Compare(fileType, "image/"+ext) == 0 {
+		return true
 	} else {
-		return false, nil
+		return false
 	}
 }
 
-func handleDirectory(arg string) {
+func handleDirectory(directoryPath string) {
 	// Read all files in directory
-	files, err := ioutil.ReadDir(arg)
+	files, err := ioutil.ReadDir(directoryPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// TODO: Sort better
+	// // Save each file path in directory
+	// var filepaths []string
+	// for _, f := range files {
+	// 	if !f.Mode().IsDir() {
+	// 		filepaths = append(filepaths, path.Join(directoryPath, f.Name()))
+	// 	}
+	// }
+	// sort.Strings(filepaths)
+
+	// // Go through and deal with each file
+	// for _, path := range filepaths {
+	// 	handleIndividualFile(path)
+	// }
+
 	// Load data of all png we find
 	for _, file := range files {
 		if !file.Mode().IsDir() {
-			filePath := path.Join(arg, file.Name())
+			filePath := path.Join(directoryPath, file.Name())
 			handleIndividualFile(filePath)
 		}
 	}
 }
 
-func handleIndividualFile(arg string) {
+func handleIndividualFile(filePath string) {
 	// Check file type
-	if f, _ := isPNG(arg); f == true { // Handle PNG
+	if isImageFile(filePath, "png") {
 
 		// Try to open file
-		imgFile, err := os.Open(arg)
+		file, err := os.Open(filePath)
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer imgFile.Close()
+		defer file.Close()
 
 		// Get image object data
-		imgData, _, err := image.Decode(imgFile)
+		imgData, _, err := image.Decode(file)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		// Load additional image data and store in array
-		imgEntry, err := getImageData(&imgData, arg)
+		imgEntry, err := extractPNGData(filePath, imgData)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -195,10 +245,11 @@ func handleIndividualFile(arg string) {
 		fileCount++
 		log.Printf("Loaded image [%d]: %s: %dx%d", fileCount, imgEntry.path, imgEntry.width, imgEntry.height)
 
-	} else { // Handle GIF
-		// File not supported
+	} else if isImageFile(filePath, "gif") {
+		extractGIFData(filePath)
+	} else {
+		log.Fatal("File type not supported.")
 	}
-
 }
 
 func usage() {
