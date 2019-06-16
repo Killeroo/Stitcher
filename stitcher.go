@@ -30,7 +30,7 @@ const iconText = `
      \_)       (_/
        \   _   /
        _)  |  (_
-      (___,'.___)   [STITCHER] - SPRITESHEET GENERATOR VERSION 1.0
+      (___,'.___)   [STITCHER] - SPRITESHEET GENERATOR VERSION 1.1
 `
 
 type ImageData struct {
